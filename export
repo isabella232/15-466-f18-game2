@@ -1,0 +1,4 @@
+#!/bin/bash
+
+blender --background --python meshes/export-meshes.py -- meshes/wolf_in_sheeps_clothing.blend:1 dist/wolf_in_sheeps_clothing.pnc
+blender --background --python meshes/export-scene.py -- meshes/wolf_in_sheeps_clothing.blend:1 dist/wolf_in_sheeps_clothing.scene

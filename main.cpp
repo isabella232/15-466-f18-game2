@@ -36,7 +36,7 @@ int main(int argc, char **argv) {
 	struct {
 		//TODO: this is where you set the title and size of your game window
 		std::string title = "TODO: Game Title";
-		glm::uvec2 size = glm::uvec2(640, 400);
+		glm::uvec2 size = glm::uvec2(640, 640);
 	} config;
 
 	//----- start connection to server ----
@@ -175,7 +175,7 @@ int main(int argc, char **argv) {
 
 		{ //(3) call the current mode's "draw" function to produce output:
 			//clear the depth+color buffers and set some default state:
-			glClearColor(0.5, 0.5, 0.5, 0.0);
+            glClearColor(0.5, 0.5, 0.5, 0.0);
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 			glEnable(GL_DEPTH_TEST);
 			glEnable(GL_BLEND);

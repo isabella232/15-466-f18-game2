@@ -36,4 +36,38 @@ void Game::update(float time) {
 
 	do_edge(glm::vec2(paddle.x + 0.5f * PaddleWidth, paddle.y), glm::vec2(paddle.x - 0.5f * PaddleWidth, paddle.y));
 
+    // new line
+    {  // if arrow keys are pressed, move crosshair
+        float dist = time * 1.0f;
+
+        if (identity.is_hunter) {
+            if (controls.move_up) {
+                crosshair.y += dist;
+            }
+            if (controls.move_down) {
+                crosshair.y -= dist;
+            }
+            if (controls.move_right) {
+                crosshair.x += dist;
+            }
+            if (controls.move_left) {
+                crosshair.x -= dist;
+            }
+        } else if (identity.is_wolf) {
+            if (controls.move_up) {
+                wolf.y += dist;
+            }
+            if (controls.move_down) {
+                wolf.y -= dist;
+            }
+            if (controls.move_right) {
+                wolf.x += dist;
+            }
+            if (controls.move_left) {
+                wolf.x -= dist;
+            }
+        }
+
+    }
+
 }

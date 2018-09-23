@@ -32,10 +32,12 @@ Load< GLuint > meshes_for_vertex_color_program(LoadTagDefault, [](){
 Scene::Transform *paddle_transform = nullptr;
 Scene::Transform *ball_transform = nullptr;
 // new line
+Scene::Transform *paddle_enemy_transform = nullptr;
 Scene::Transform *cow_transform = nullptr;
 Scene::Transform *pig_transform = nullptr;
 Scene::Transform *sheep_transform = nullptr;
 Scene::Transform *wolf_transform = nullptr;
+Scene::Transform *crosshair_transform = nullptr;
 
 Scene::Camera *camera = nullptr;
 
@@ -69,24 +71,28 @@ Load< Scene > scene(LoadTagDefault, [](){
 		}
         // new line
 		if (t->name == "Cow") {
-            std::cout << t->name << std::endl;
 			if (cow_transform) throw std::runtime_error("Multiple 'Cow' transforms in scene.");
 			cow_transform = t;
 		}
 		if (t->name == "Pig") {
-            std::cout << t->name << std::endl;
 			if (pig_transform) throw std::runtime_error("Multiple 'Pig' transforms in scene.");
 			pig_transform = t;
 		}
 		if (t->name == "Sheep") {
-            std::cout << t->name << std::endl;
 			if (sheep_transform) throw std::runtime_error("Multiple 'Sheep' transforms in scene.");
 			sheep_transform = t;
 		}
 		if (t->name == "Wolf") {
-            std::cout << t->name << std::endl;
 			if (wolf_transform) throw std::runtime_error("Multiple 'Wolf' transforms in scene.");
 			wolf_transform = t;
+		}
+		if (t->name == "Paddle_Enemy") {
+			if (paddle_enemy_transform) throw std::runtime_error("Multiple 'Paddle_Enemy' transforms in scene.");
+            paddle_enemy_transform = t;
+		}
+		if (t->name == "Crosshair") {
+			if (crosshair_transform) throw std::runtime_error("Multiple 'Crosshair' transforms in scene.");
+            crosshair_transform = t;
 		}
 	}
 	if (!paddle_transform) throw std::runtime_error("No 'Paddle' transform in scene.");
@@ -95,6 +101,7 @@ Load< Scene > scene(LoadTagDefault, [](){
 	if (!pig_transform) throw std::runtime_error("No 'Pig' transform in scene.");
 	if (!sheep_transform) throw std::runtime_error("No 'Sheep' transform in scene.");
 	if (!wolf_transform) throw std::runtime_error("No 'Wolf' transform in scene.");
+	if (!crosshair_transform) throw std::runtime_error("No 'Crosshair' transform in scene.");
 
 	//look up the camera:
 	for (Scene::Camera *c = ret->first_camera; c != nullptr; c = c->alloc_next) {
@@ -126,11 +133,40 @@ bool GameMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 		state.paddle.x = std::min(state.paddle.x,  0.5f * Game::FrameWidth - 0.5f * Game::PaddleWidth);
 	}
 
+    {  // control crosshair
+        if (evt.type == SDL_KEYDOWN || evt.type == SDL_KEYUP) {
+            //if (evt.key.keysym.scancode == SDL_SCANCODE_W) {
+            if (evt.key.keysym.scancode == SDL_SCANCODE_UP) {
+                state.controls.move_up = (evt.type == SDL_KEYDOWN);
+                return true;
+            //} else if (evt.key.keysym.scancode == SDL_SCANCODE_S) {
+            } else if (evt.key.keysym.scancode == SDL_SCANCODE_DOWN) {
+                state.controls.move_down = (evt.type == SDL_KEYDOWN);
+                return true;
+            //} else if (evt.key.keysym.scancode == SDL_SCANCODE_A) {
+            } else if (evt.key.keysym.scancode == SDL_SCANCODE_LEFT) {
+                state.controls.move_left = (evt.type == SDL_KEYDOWN);
+                return true;
+            //} else if (evt.key.keysym.scancode == SDL_SCANCODE_D) {
+            } else if (evt.key.keysym.scancode == SDL_SCANCODE_RIGHT) {
+                state.controls.move_right = (evt.type == SDL_KEYDOWN);
+                return true;
+            }
+        }
+    }
+
 	return false;
 }
 
 void GameMode::update(float elapsed) {
 	state.update(elapsed);
+
+
+    if (state.identity.is_hunter) {
+        // send crosshair position to server
+    } else if (state.identity.is_wolf) {
+        // send wolf position to server
+    }
 
 	if (client.connection) {
 		//send game state to server:
@@ -138,16 +174,43 @@ void GameMode::update(float elapsed) {
 		client.connection.send_raw(&state.paddle.x, sizeof(float));
 	}
 
-	client.poll([&](Connection *c, Connection::Event event){
+	client.poll([&](Connection *c, Connection::Event event) {
 		if (event == Connection::OnOpen) {
 			//probably won't get this.
 		} else if (event == Connection::OnClose) {
 			std::cerr << "Lost connection to server." << std::endl;
 		} else { assert(event == Connection::OnRecv);
-			std::cerr << "Ignoring " << c->recv_buffer.size() << " bytes from server." << std::endl;
-			c->recv_buffer.clear();
+            if (c->recv_buffer[0] == 'i') {
+                // TODO: set up identity
+                if (c->recv_buffer[1] == 'h') {
+                    state.identity.is_hunter = true;
+                    std::cout << "I am a hunter" << std::endl;
+                } else if (c->recv_buffer[1] == 'w') {
+                    state.identity.is_wolf = true;
+                    std::cout << "I am a wolf" << std::endl;
+                }
+            } else if (state.identity.is_hunter) {
+                // receive wolf_position and update state
+
+                // receive animal_position and update state
+            } else if (state.identity.is_wolf) {
+                // receive crosshair_position and update state
+
+                // receive animal_position and update state
+            }
+
+            //std::cerr << "Ignoring " << c->recv_buffer.size() << " bytes from server." << std::endl;
+            //std::cout << "Receving " << c->recv_buffer[0] << " from server" << std::endl;
+            //if (c->recv_buffer[0] == 'p') {
+                //if (c->recv_buffer.size() < 1 + sizeof(float)) {
+                //} else {
+                    //memcpy(&state.paddle.x, c->recv_buffer.data(), sizeof(float));
+                    c->recv_buffer.clear();
+                //}
+            //}
 		}
 	});
+
 
 	//copy game state to scene positions:
 	ball_transform->position.x = state.ball.x;
@@ -155,12 +218,22 @@ void GameMode::update(float elapsed) {
 
 	paddle_transform->position.x = state.paddle.x;
 	paddle_transform->position.y = state.paddle.y;
+
+	paddle_enemy_transform->position.x = state.paddle_enemy.x;
+	paddle_enemy_transform->position.y = state.paddle_enemy.y;
+
+    crosshair_transform->position.x = state.crosshair.x;
+    crosshair_transform->position.y = state.crosshair.y;
+
+    wolf_transform->position.x = state.wolf.x;
+    wolf_transform->position.y = state.wolf.y;
 }
 
 void GameMode::draw(glm::uvec2 const &drawable_size) {
 	camera->aspect = drawable_size.x / float(drawable_size.y);
 
-	glClearColor(0.25f, 0.0f, 0.5f, 0.0f);
+	//glClearColor(0.25f, 0.0f, 0.5f, 0.0f);
+    glClearColor(136.0f/255.0f, 176.0f/255.0f, 75.0f/255.0f, 0.0);  // grass color
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	//set up basic OpenGL state:
