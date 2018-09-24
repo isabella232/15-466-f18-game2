@@ -32,7 +32,6 @@ Load< GLuint > meshes_for_vertex_color_program(LoadTagDefault, [](){
 Scene::Transform *paddle_transform = nullptr;
 Scene::Transform *ball_transform = nullptr;
 // new line
-Scene::Transform *paddle_enemy_transform = nullptr;
 Scene::Transform *cow_transform = nullptr;
 Scene::Transform *pig_transform = nullptr;
 Scene::Transform *sheep_transform = nullptr;
@@ -85,10 +84,6 @@ Load< Scene > scene(LoadTagDefault, [](){
 		if (t->name == "Wolf") {
 			if (wolf_transform) throw std::runtime_error("Multiple 'Wolf' transforms in scene.");
 			wolf_transform = t;
-		}
-		if (t->name == "Paddle_Enemy") {
-			if (paddle_enemy_transform) throw std::runtime_error("Multiple 'Paddle_Enemy' transforms in scene.");
-            paddle_enemy_transform = t;
 		}
 		if (t->name == "Crosshair") {
 			if (crosshair_transform) throw std::runtime_error("Multiple 'Crosshair' transforms in scene.");
@@ -161,21 +156,15 @@ bool GameMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 void GameMode::update(float elapsed) {
 	state.update(elapsed);
 
-    static float accumulate_elapsed = 0.0f;
-    accumulate_elapsed += elapsed;
-
-	if (client.connection && accumulate_elapsed > 1.0f/60.0f) {
-        accumulate_elapsed = 0.0f;
+	if (client.connection) {
         // send crosshair/wolf position to server
         if (state.identity.is_hunter) {
-            // cp: Crosshair Position
-            //std::cout << "hunter send" << std::endl;
+            // pc: Crosshair Position
             client.connection.send_raw("pc", 2);
             client.connection.send_raw(&state.crosshair.x, sizeof(float));
             client.connection.send_raw(&state.crosshair.y, sizeof(float));
         } else if (state.identity.is_wolf) {
-            // wp: Wolf Position
-            //std::cout << "wolf send" << std::endl;
+            // pw: Wolf Position
             client.connection.send_raw("pw", 2);
             client.connection.send_raw(&state.wolf.x, sizeof(float));
             client.connection.send_raw(&state.wolf.y, sizeof(float));
@@ -186,8 +175,6 @@ void GameMode::update(float elapsed) {
 	}
 
 	client.poll([&](Connection *c, Connection::Event event) {
-        //std::cout << "buffer size " << c->recv_buffer.size() << std::endl;
-        //std::cout << "Receive msg start with " << c->recv_buffer.at(0) << std::endl;
 		if (event == Connection::OnOpen) {
 			//probably won't get this.
 		} else if (event == Connection::OnClose) {
@@ -198,49 +185,35 @@ void GameMode::update(float elapsed) {
                     size_t data_len = 2 * sizeof(char);
                     if (c->recv_buffer.size() < data_len) {
                         return;
-                    }
-                    else {
-                        //std::cout << c->recv_buffer.at(0) << c->recv_buffer.at(1) << c->recv_buffer.at(2) << std::endl;
+                    } else {
                         if (c->recv_buffer[1] == 'h') {
-                            //std::cout << "set hunter" << std::endl;
                             state.identity.is_hunter = true;
-                        }
-                        else if (c->recv_buffer[1] == 'w') {
-                            //std::cout << "set wolf" << std::endl;
+                        } else if (c->recv_buffer[1] == 'w') {
                             state.identity.is_wolf = true;
                         }
                         c->recv_buffer.clear();
-                        //std::cout << "cleared buffer size " << c->recv_buffer.size() << std::endl;
                     }
-                }
-                // receive position data before creating a character, remove data
-                else if (c->recv_buffer[0] == 'p' && c->recv_buffer.size() >= 10) {
+                } else if (c->recv_buffer[0] == 'p' && c->recv_buffer.size() >= 10) {
+                    // ignore any data received before both of two players are registered
+
+                    // probably won't get here because server will not send position data until both
+                    // players are registered
                     c->recv_buffer.erase(c->recv_buffer.begin(),
                                          c->recv_buffer.begin() + 10);
                     c->recv_buffer.shrink_to_fit();
                 }
-            }
-            else {
-                if (c->recv_buffer[0] == 'p') {
-                    size_t data_len = 2 * (sizeof(char) + sizeof(float));
-                    if (c->recv_buffer.size() < data_len) {
-                        return;
+            } else if (c->recv_buffer[0] == 'p') {
+                if (c->recv_buffer.size() < 2 * (sizeof(char) + sizeof(float))) {
+                    return;
+                } else {
+                    if (c->recv_buffer[1] == 'w' && state.identity.is_hunter) {
+                        memcpy(&state.wolf.x, c->recv_buffer.data() + 2, sizeof(float));
+                        memcpy(&state.wolf.y, c->recv_buffer.data() + 2 + sizeof(float), sizeof(float));
+                    } else if (c->recv_buffer[1] == 'c' && state.identity.is_wolf) {
+                        memcpy(&state.crosshair.x, c->recv_buffer.data() + 2, sizeof(float));
+                        memcpy(&state.crosshair.y, c->recv_buffer.data() + 2 + sizeof(float), sizeof(float));
                     }
-                    else {
-                        if (c->recv_buffer[1] == 'w' && state.identity.is_hunter) {
-                            //std::cout << "hunter copy wolf data" << std::endl;
-                            memcpy(&state.wolf.x, c->recv_buffer.data() + 2, sizeof(float));
-                            memcpy(&state.wolf.y, c->recv_buffer.data() + 2 + sizeof(float), sizeof(float));
-                        }
-                        else if (c->recv_buffer[1] == 'c' && state.identity.is_wolf) {
-                            //std::cout << "wolf copy hunter data" << std::endl;
-                            memcpy(&state.crosshair.x, c->recv_buffer.data() + 2, sizeof(float));
-                            memcpy(&state.crosshair.y, c->recv_buffer.data() + 2 + sizeof(float), sizeof(float));
-                        }
-                        c->recv_buffer.erase(c->recv_buffer.begin(),
-                                             c->recv_buffer.begin() + data_len);
-                        c->recv_buffer.shrink_to_fit();
-                    }
+                    c->recv_buffer.clear();
                 }
             }
 		}
@@ -255,9 +228,6 @@ void GameMode::update(float elapsed) {
 
 	paddle_transform->position.x = state.paddle.x;
 	paddle_transform->position.y = state.paddle.y;
-
-	paddle_enemy_transform->position.x = state.paddle_enemy.x;
-	paddle_enemy_transform->position.y = state.paddle_enemy.y;
 
     crosshair_transform->position.x = state.crosshair.x;
     crosshair_transform->position.y = state.crosshair.y;
