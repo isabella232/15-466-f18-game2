@@ -2,6 +2,7 @@
 
 #include "MenuMode.hpp"
 #include "Load.hpp"
+#include "Sound.hpp"
 #include "MeshBuffer.hpp"
 #include "Scene.hpp"
 #include "gl_errors.hpp" //helper for dumpping OpenGL error messages
@@ -36,6 +37,18 @@ Load< GLuint > meshes_for_vertex_color_program(LoadTagDefault, [](){
 	return new GLuint(meshes->make_vao_for_program(vertex_color_program->program));
 });
 
+Load< Sound::Sample > sheep_sound(LoadTagDefault, [](){
+	return new Sound::Sample(data_path("sheep.wav"));
+});
+
+Load< Sound::Sample > cow_sound(LoadTagDefault, [](){
+	return new Sound::Sample(data_path("cow.wav"));
+});
+
+Load< Sound::Sample > pig_sound(LoadTagDefault, [](){
+	return new Sound::Sample(data_path("pig.wav"));
+});
+
 // new line
 std::map< uint32_t, Scene::Object* > animal_list;
 Scene::Transform *cow_transform = nullptr;
@@ -44,7 +57,8 @@ Scene::Transform *sheep_transform = nullptr;
 Scene::Transform *wolf_transform = nullptr;
 Scene::Transform *crosshair_transform = nullptr;
 Scene *non_const_scene = nullptr;  // non-const scene pointer for delete_transform function
-std::queue< std::pair< GLuint, GLuint > > animal_skin;
+//std::queue< std::pair< GLuint, GLuint > > animal_skin;
+std::queue< std::pair< std::string, std::pair< GLuint, GLuint > > > animal_skin;
 
 Scene::Camera *camera = nullptr;
 
@@ -65,7 +79,8 @@ Load< Scene > scene(LoadTagDefault, [](){
 		obj->count = mesh.count;
 
         if (m == "Cow" || m == "Pig" || m == "Sheep") {
-            animal_skin.push(std::make_pair(mesh.start, mesh.count));
+            animal_skin.push(std::make_pair(m, std::make_pair(mesh.start, mesh.count)));
+            //animal_skin.push(std::make_pair(mesh.start, mesh.count));
         }
 
 	});
@@ -222,8 +237,18 @@ bool GameMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
             // wolf press c to change skin
             if (evt.key.keysym.scancode == SDL_SCANCODE_C && evt.type == SDL_KEYDOWN) {
                 if (client.connection && state.identity.is_wolf) {
-                    dbg_cout("change");
                     client.connection.send_raw("c", 1);
+
+                    auto skin = animal_skin.front();
+                    animal_skin.pop();
+                    animal_skin.push(skin);
+                    if (skin.first == "Sheep") {
+                        sheep_sound->play( wolf_transform->make_local_to_world() * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f) );
+                    } else if (skin.first == "Cow") {
+                        cow_sound->play( wolf_transform->make_local_to_world() * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f) );
+                    } else if (skin.first == "Pig") {
+                        pig_sound->play( wolf_transform->make_local_to_world() * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f) );
+                    }
                 }
             }
         }
@@ -390,9 +415,16 @@ void GameMode::update(float elapsed) {
 
                     auto skin = animal_skin.front();
                     animal_skin.pop();
-                    obj->start = skin.first;
-                    obj->count = skin.second;
+                    obj->start = skin.second.first;
+                    obj->count = skin.second.second;
                     animal_skin.push(skin);
+                    if (skin.first == "Sheep") {
+                        sheep_sound->play( wolf_transform->make_local_to_world() * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f) );
+                    } else if (skin.first == "Cow") {
+                        cow_sound->play( wolf_transform->make_local_to_world() * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f), 2.0f );
+                    } else if (skin.first == "Pig") {
+                        pig_sound->play( wolf_transform->make_local_to_world() * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f) );
+                    }
 
                     c->recv_buffer.erase(c->recv_buffer.begin(),
                                          c->recv_buffer.begin() + 1);

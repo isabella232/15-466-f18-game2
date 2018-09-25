@@ -23,6 +23,14 @@ Good / Bad / Ugly Code:
 
 TODO: provide examples of code you wrote from this project that you think is good (elegant, simple, useful), bad (hack-y, brittle, unreadable), and ugly (particularly inelegant). Provide a sentence or two of justification for the examples.
 
+Credit of Sound Effects:
+
+- [Sheep](http://soundbible.com/821-Bleat.html)
+
+- [Cow](http://soundbible.com/1572-Single-Cow.html)
+
+- [Pig](https://www.freesoundeffects.com/free-track/pig3-466300/)
+
 # Using This Base Code
 
 Before you dive into the code, it helps to understand the overall structure of this repository.
