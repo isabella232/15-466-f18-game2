@@ -18,6 +18,7 @@
 #include <map>
 #include <cstddef>
 #include <random>
+#include <queue>
 
 #define DEBUG
 #ifdef DEBUG
@@ -28,7 +29,6 @@
 
 
 Load< MeshBuffer > meshes(LoadTagDefault, [](){
-	//return new MeshBuffer(data_path("paddle-ball.pnc"));
 	return new MeshBuffer(data_path("wolf_in_sheeps_clothing.pnc"));
 });
 
@@ -44,6 +44,7 @@ Scene::Transform *sheep_transform = nullptr;
 Scene::Transform *wolf_transform = nullptr;
 Scene::Transform *crosshair_transform = nullptr;
 Scene *non_const_scene = nullptr;  // non-const scene pointer for delete_transform function
+std::queue< std::pair< GLuint, GLuint > > animal_skin;
 
 Scene::Camera *camera = nullptr;
 
@@ -62,6 +63,11 @@ Load< Scene > scene(LoadTagDefault, [](){
 		obj->vao = *meshes_for_vertex_color_program;
 		obj->start = mesh.start;
 		obj->count = mesh.count;
+
+        if (m == "Cow" || m == "Pig" || m == "Sheep") {
+            animal_skin.push(std::make_pair(mesh.start, mesh.count));
+        }
+
 	});
     non_const_scene = ret;
 
@@ -212,6 +218,14 @@ bool GameMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
                     }  // end for
                 }  // end else if
             }  // end if
+
+            // wolf press c to change skin
+            if (evt.key.keysym.scancode == SDL_SCANCODE_C && evt.type == SDL_KEYDOWN) {
+                if (client.connection && state.identity.is_wolf) {
+                    dbg_cout("change");
+                    client.connection.send_raw("c", 1);
+                }
+            }
         }
     }
 
@@ -370,6 +384,18 @@ void GameMode::update(float elapsed) {
                         c->recv_buffer.erase(c->recv_buffer.begin(),
                                              c->recv_buffer.begin() + 1 + 2 * sizeof(uint32_t));
                     }
+                } else if (*(c->recv_buffer.begin()) == 'c' && state.identity.is_hunter) {
+                    // change wolf's skin
+                    Scene::Object *obj = animal_list[wolf_transform->id];
+
+                    auto skin = animal_skin.front();
+                    animal_skin.pop();
+                    obj->start = skin.first;
+                    obj->count = skin.second;
+                    animal_skin.push(skin);
+
+                    c->recv_buffer.erase(c->recv_buffer.begin(),
+                                         c->recv_buffer.begin() + 1);
                 }
             }
 		}

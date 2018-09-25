@@ -129,6 +129,12 @@ int main(int argc, char **argv) {
                             c->recv_buffer.erase(c->recv_buffer.begin(),
                                                  c->recv_buffer.begin() + 1 + 2 * sizeof(uint32_t));
                         }
+                    } else if (*(c->recv_buffer.begin()) == 'c') {  // wolf change skin
+                        if (hunter_is_on) {
+                            server.connections.front().send_raw("c", 1);
+                        }
+                        c->recv_buffer.erase(c->recv_buffer.begin(),
+                                             c->recv_buffer.begin() + 1);
                     }
 
                 }  // end while
