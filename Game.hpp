@@ -12,8 +12,6 @@ struct Game {
     glm::vec2 cow;
     glm::vec2 pig;
     glm::vec2 sheep;
-    //glm::vec2 wolf = glm::vec2(0.0f, 0.0f);
-    //glm::vec2 crosshair = glm::vec2(0.0f, 0.0f);
     glm::vec2 wolf;
     glm::vec2 crosshair;
 

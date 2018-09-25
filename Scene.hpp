@@ -9,18 +9,49 @@
 #include <list>
 #include <functional>
 #include <string>
+#include <map>
 
 //"Scene" manages a hierarchy of transformations with, potentially, attached information.
 struct Scene {
 
+    // default 8 directions
+    // right = 1, up_right = 2, up = 3, ... in ccw
+    struct Direction {
+        glm::quat get_quat(double vx, double vy, double vz, double theta) {
+            theta /= 2.0;
+            return glm::quat(std::cos(theta), std::sin(theta)*vx, std::sin(theta)*vy, std::sin(theta)*vz);
+        }
+
+        glm::quat up = glm::quat(0.0f, 0.0f, 1.0f/std::sqrt(2.0f), 1.0f/std::sqrt(2.0f));
+        glm::quat down = glm::quat(1.0f/std::sqrt(2.0f), 1.0f/std::sqrt(2.0f), 0.0f, 0.0f);
+        glm::quat right = glm::quat(0.5f, 0.5f, 0.5f, 0.5f);
+        glm::quat left = glm::quat(0.5f, 0.5f, -0.5f, -0.5f);
+        glm::quat up_right = up * get_quat(0.0, 1.0, 0.0, -M_PI/4.0);
+        glm::quat up_left = up * get_quat(0.0, 1.0, 0.0, M_PI/4.0);
+        glm::quat down_right = down * get_quat(0.0, 1.0, 0.0, M_PI/4.0);
+        glm::quat down_left = down * get_quat(0.0, 1.0, 0.0, -M_PI/4.0);
+
+        std::map< uint32_t, glm::quat* > direction_map = {{1, &right},
+                                                          {2, &up_right},
+                                                          {3, &up},
+                                                          {4, &up_left},
+                                                          {5, &left},
+                                                          {6, &down_left},
+                                                          {7, &down},
+                                                          {8, &down_right}};
+    } direction ;
+
+
 	struct Transform {
 		//useful to know sometimes:
 		std::string name;
+        uint32_t id = 0;  // animal ID, if 0 -> non-animal
 
 		//simple specification:
 		glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f);
 		glm::quat rotation = glm::quat(0.0f, 0.0f, 0.0f, 1.0f);
 		glm::vec3 scale = glm::vec3(1.0f, 1.0f, 1.0f);
+        uint32_t direction = 7;  // from 1-8, default 7 (facing down)
 
 		//hierarchy information:
 		Transform *parent = nullptr;

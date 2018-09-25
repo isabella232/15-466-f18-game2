@@ -104,7 +104,23 @@ int main(int argc, char **argv) {
                             c->recv_buffer.erase(c->recv_buffer.begin(),
                                                  c->recv_buffer.begin() + 1 + sizeof(uint32_t));
                         }
+                    } else if (*(c->recv_buffer.begin()) == 'd') {
+                        if (c->recv_buffer.size() < 1 + 2 * sizeof(uint32_t)) {
+                            return;
+                        } else {
+                            uint32_t id, direction;
+                            memcpy(&id, c->recv_buffer.data() + 1, sizeof(uint32_t));
+                            memcpy(&direction, c->recv_buffer.data() + 1 + sizeof(uint32_t), sizeof(uint32_t));
+                            if (hunter_is_on) {
+                                server.connections.front().send_raw("d", 1);
+                                server.connections.front().send_raw(&id, sizeof(float));
+                                server.connections.front().send_raw(&direction, sizeof(float));
+                            }
+                            c->recv_buffer.erase(c->recv_buffer.begin(),
+                                                 c->recv_buffer.begin() + 1 + 2 * sizeof(uint32_t));
+                        }
                     }
+
                 }  // end while
 			}  // end else
         }, 0.01);

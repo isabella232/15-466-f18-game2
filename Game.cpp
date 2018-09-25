@@ -38,7 +38,8 @@ void Game::update(float time) {
 
     // new line
     {  // if arrow keys are pressed, move your character (hunter or wolf)
-        float dist = time * 1.0f;
+        float speed = 2.0f;
+        float dist = time * speed;
         if (identity.is_hunter) {
             if (controls.move_up) {
                 crosshair.y += dist;

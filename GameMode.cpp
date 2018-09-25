@@ -138,6 +138,7 @@ GameMode::GameMode(Client &client_) : client(client_) {
         for (Scene::Object *obj = scene->first_object; obj != nullptr; obj = obj->alloc_next) {
             auto name = obj->transform->name;
             if (name == "Cow" || name == "Pig" || name == "Sheep" || name == "Wolf") {
+                obj->transform->id = id;
                 animal_list[id++] = obj;
             }
         }
@@ -227,6 +228,36 @@ bool GameMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 void GameMode::update(float elapsed) {
 	state.update(elapsed);
 
+    // change wolf direction
+    if (state.identity.is_wolf) {
+        if (state.controls.move_up && state.controls.move_right) {
+            wolf_transform->rotation = scene->direction.up_right;
+            wolf_transform->direction = 2;
+        } else if (state.controls.move_up && state.controls.move_left) {
+            wolf_transform->rotation = scene->direction.up_left;
+            wolf_transform->direction = 4;
+        } else if (state.controls.move_down && state.controls.move_right) {
+            wolf_transform->rotation = scene->direction.down_right;
+            wolf_transform->direction = 8;
+        } else if (state.controls.move_down && state.controls.move_left) {
+            wolf_transform->rotation = scene->direction.down_left;
+            wolf_transform->direction = 6;
+        } else if (state.controls.move_up) {
+            wolf_transform->rotation = scene->direction.up;
+            wolf_transform->direction = 3;
+        } else if (state.controls.move_down) {
+            wolf_transform->rotation = scene->direction.down;
+            wolf_transform->direction = 7;
+        } else if (state.controls.move_right) {
+            wolf_transform->rotation = scene->direction.right;
+            wolf_transform->direction = 1;
+        } else if (state.controls.move_left) {
+            wolf_transform->rotation = scene->direction.left;
+            wolf_transform->direction = 5;
+        }
+    }
+
+
     // send crosshair/wolf position to server when game state is changed
 	if (client.connection && state.need_to_send()) {
         // positions
@@ -250,6 +281,13 @@ void GameMode::update(float elapsed) {
             client.connection.send_raw("a", 1);
             client.connection.send_raw(&state.try_attack.second, sizeof(uint32_t));
             state.try_attack = std::make_pair(false, 0);  // reset try_attack
+        }
+
+        // send direction data: ["d"][id][uint32_t direction]
+        if (state.identity.is_wolf) {
+            client.connection.send_raw("d", 1);
+            client.connection.send_raw(&wolf_transform->id, sizeof(uint32_t));
+            client.connection.send_raw(&wolf_transform->direction, sizeof(uint32_t));
         }
 	}
 
@@ -318,6 +356,20 @@ void GameMode::update(float elapsed) {
                         }
                         c->recv_buffer.erase(c->recv_buffer.begin(),
                                              c->recv_buffer.begin() + 1 + sizeof(uint32_t));
+                    }
+                } else if (*(c->recv_buffer.begin()) == 'd') {
+                    if (c->recv_buffer.size() < 1 + 2 * sizeof(uint32_t)) {
+                        return;
+                    } else {
+                        if (state.identity.is_hunter) {
+                            uint32_t id, direction;
+                            memcpy(&id, c->recv_buffer.data() + 1, sizeof(uint32_t));
+                            memcpy(&direction, c->recv_buffer.data() + 1 + sizeof(uint32_t), sizeof(uint32_t));
+                            dbg_cout(direction);
+                            animal_list[id]->transform->rotation = *(scene->direction.direction_map.at(direction));
+                        }
+                        c->recv_buffer.erase(c->recv_buffer.begin(),
+                                             c->recv_buffer.begin() + 1 + 2 * sizeof(uint32_t));
                     }
                 }
             }
