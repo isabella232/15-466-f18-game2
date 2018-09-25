@@ -15,11 +15,11 @@ How To Play:
 
 This is a two players game. The first one would be the hunter. The second one would be the wolf.
 
-- Hunter: Press <kbd>WASD</kbd> or arror keys to move your crosshair,
+- Hunter: Press <kbd>WASD</kbd> or <kbd>arror keys</kbd> to move your crosshair,
           <kbd>SPACE</kbd> to shot. You want to kill the wolf in disguise
           as soon as possible.
 
-- Wolf: Press <kbd>WASD</kbd> or arror keys to move. Press <kbd>SPACE</kbd>
+- Wolf: Press <kbd>WASD</kbd> or <kbd>arror keys</kbd> to move. Press <kbd>SPACE</kbd>
         to eat nearby animals. Press <kbd>C</kbd> to change your cloth.
         Note that you still look the same in your window after changing clothes. You can tell which animal
         you are by listening to your cry when changing clothes.
