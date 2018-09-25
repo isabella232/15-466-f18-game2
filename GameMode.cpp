@@ -49,6 +49,18 @@ Load< Sound::Sample > pig_sound(LoadTagDefault, [](){
 	return new Sound::Sample(data_path("pig.wav"));
 });
 
+Load< Sound::Sample > pig_dead_sound(LoadTagDefault, [](){
+	return new Sound::Sample(data_path("pig_dead.wav"));
+});
+
+Load< Sound::Sample > shotgun_sound(LoadTagDefault, [](){
+	return new Sound::Sample(data_path("shotgun.wav"));
+});
+
+auto start_with = [](std::string& target, std::string to_match) -> bool {
+    return target.find(to_match) == 0;
+};
+
 // new line
 std::map< uint32_t, Scene::Object* > animal_list;
 Scene::Transform *cow_transform = nullptr;
@@ -144,9 +156,6 @@ GameMode::GameMode(Client &client_) : client(client_) {
 
     {  // register animal to animal_list
         uint32_t id = 1;
-        auto start_with = [](std::string& target, std::string to_match) -> bool {
-            return target.find(to_match) == 0;
-        };
         for (Scene::Object *obj = scene->first_object; obj != nullptr; obj = obj->alloc_next) {
             std::string name = obj->transform->name;
             if (start_with(name, "Cow") || start_with(name, "Pig") ||
@@ -206,6 +215,12 @@ bool GameMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
             if (evt.key.keysym.scancode == SDL_SCANCODE_SPACE && evt.type == SDL_KEYDOWN) {
                 if (state.identity.is_hunter) {
                     dbg_cout("Hunter attack");
+                    shotgun_sound->play( crosshair_transform->make_local_to_world() * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f) );
+                    {  // tell wolf to play shotgun
+                        if (client.connection) {
+                            client.connection.send_raw("s", 1);
+                        }
+                    }
                     for (auto &a : animal_list) {
                         uint32_t id = a.first;
                         Scene::Object *obj = a.second;
@@ -387,6 +402,9 @@ void GameMode::update(float elapsed) {
                         if (!animal_list.empty()) {
                             Scene::Object *obj = animal_list[target];
                             dbg_cout("Receive kill id " << target << " name " << obj->transform->name);
+                            if (start_with(obj->transform->name, "Pig")) {
+                                pig_dead_sound->play(obj->transform->make_local_to_world() * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
+                            }
                             non_const_scene->delete_object(obj);
                             animal_list.erase(target);
                         }
@@ -419,13 +437,17 @@ void GameMode::update(float elapsed) {
                     obj->count = skin.second.second;
                     animal_skin.push(skin);
                     if (skin.first == "Sheep") {
-                        sheep_sound->play( wolf_transform->make_local_to_world() * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f) );
+                        sheep_sound->play(wolf_transform->make_local_to_world() * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
                     } else if (skin.first == "Cow") {
-                        cow_sound->play( wolf_transform->make_local_to_world() * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f), 2.0f );
+                        cow_sound->play(wolf_transform->make_local_to_world() * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f), 2.0f);
                     } else if (skin.first == "Pig") {
-                        pig_sound->play( wolf_transform->make_local_to_world() * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f) );
+                        pig_sound->play(wolf_transform->make_local_to_world() * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
                     }
 
+                    c->recv_buffer.erase(c->recv_buffer.begin(),
+                                         c->recv_buffer.begin() + 1);
+                } else if (*(c->recv_buffer.begin()) == 's' && state.identity.is_wolf) {
+                    shotgun_sound->play( crosshair_transform->make_local_to_world() * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f) );
                     c->recv_buffer.erase(c->recv_buffer.begin(),
                                          c->recv_buffer.begin() + 1);
                 }

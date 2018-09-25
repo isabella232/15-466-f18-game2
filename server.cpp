@@ -52,7 +52,7 @@ int main(int argc, char **argv) {
                             size_t living_animal_size;
                             memcpy(&living_animal_size, c->recv_buffer.data() + 1, sizeof(size_t));
                             {  // init living_animal
-                                for (uint32_t id = 1; id < living_animal_size; id++) {
+                                for (uint32_t id = 1; id <= living_animal_size; id++) {
                                     state.living_animal.insert(id);
                                 }
                             }
@@ -132,6 +132,12 @@ int main(int argc, char **argv) {
                     } else if (*(c->recv_buffer.begin()) == 'c') {  // wolf change skin
                         if (hunter_is_on) {
                             server.connections.front().send_raw("c", 1);
+                        }
+                        c->recv_buffer.erase(c->recv_buffer.begin(),
+                                             c->recv_buffer.begin() + 1);
+                    } else if (*(c->recv_buffer.begin()) == 's') {  // hunter fires
+                        if (wolf_is_on) {
+                            server.connections.back().send_raw("s", 1);
                         }
                         c->recv_buffer.erase(c->recv_buffer.begin(),
                                              c->recv_buffer.begin() + 1);

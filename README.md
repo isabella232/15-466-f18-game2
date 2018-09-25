@@ -1,11 +1,11 @@
 # Game Information
 (Note: fill in this portion with information about your game.)
 
-Title: (TODO: your game's title)
+Title: Wolf in Sheep's Clothing
 
-Author: (TODO: your name)
+Author: Yen-Hsiang Huang
 
-Design Document: [TODO: name of design document](TODO: link to design document)
+Design Document: [Wolf in Sheep's Clothing](http://graphics.cs.cmu.edu/courses/15-466-f18/game2-designs/yitongl/)
 
 Screen Shot:
 
@@ -13,15 +13,39 @@ Screen Shot:
 
 How To Play:
 
-TODO: describe the controls and (if needed) goals/strategy.
+This is a two players game. The first one would be the hunter. The second one would be the wolf.
+
+- Hunter: Press WASD or arror keys to move your crosshair, SPACE to shot. You want to kill the wolf in disguise
+          as soon as possible.
+
+- Wolf: Press WASD or arror keys to move. Press SPACE to eat nearby animals. Press C to change your cloth.
+        Note that you still look the same in your window after changing clothes. You can tell which animal
+        you are by listening to your cry when changing clothes.
 
 Changes From The Design Document:
 
-TODO: what did you need to add/remove/modify from the original design? Why?
+I added
+
+- Cool sound effect of shotgun.
+
+I didn't accomplish
+
+- Multiple pan (should be three in the design document).
+
+- Random walking of animals and walking boundary (Yes, you can easily escape from this farm).
+  The walking boundary is not hard in this game, and it can be implemented in a relatively short time.
 
 Good / Bad / Ugly Code:
 
-TODO: provide examples of code you wrote from this project that you think is good (elegant, simple, useful), bad (hack-y, brittle, unreadable), and ugly (particularly inelegant). Provide a sentence or two of justification for the examples.
+- Message handling between server and clients are quite tricky. It takes several if-else statements to distinguish
+  different situations.
+
+- I added a while loop, used erase() and begin() (instead of [] operator which might access wrong memory block)
+  and reduce the number of send() in order not to burn down the server. This is not very elegant but really
+  improve the synchronization quality.
+
+- Overall, this assignment is not very hard but really takes time to think everything carefully. Sometimes a
+  little mistake takes a whole night to debug (this is also why I cannot do 100% in this assignment...).
 
 Credit of Sound Effects:
 
@@ -30,6 +54,10 @@ Credit of Sound Effects:
 - [Cow](http://soundbible.com/1572-Single-Cow.html)
 
 - [Pig](https://www.freesoundeffects.com/free-track/pig3-466300/)
+
+- [Pig dead](http://soundbible.com/1221-Pig-Oink.html)
+
+- [Shotgun](http://soundbible.com/1919-Shotgun-Blast.html)
 
 # Using This Base Code
 
