@@ -36,7 +36,7 @@ struct Game {
     } identity;
 
     // id of living animals
-    std::set< uint32_t > living_animal = {1, 2, 3, 4};
+    std::set< uint32_t > living_animal;
 
     //------ anything is updated? ------
     bool need_to_send();

@@ -36,8 +36,6 @@ Load< GLuint > meshes_for_vertex_color_program(LoadTagDefault, [](){
 	return new GLuint(meshes->make_vao_for_program(vertex_color_program->program));
 });
 
-Scene::Transform *paddle_transform = nullptr;
-Scene::Transform *ball_transform = nullptr;
 // new line
 std::map< uint32_t, Scene::Object* > animal_list;
 Scene::Transform *cow_transform = nullptr;
@@ -69,14 +67,6 @@ Load< Scene > scene(LoadTagDefault, [](){
 
 	//look up paddle and ball transforms:
 	for (Scene::Transform *t = ret->first_transform; t != nullptr; t = t->alloc_next) {
-		if (t->name == "Paddle") {
-			if (paddle_transform) throw std::runtime_error("Multiple 'Paddle' transforms in scene.");
-			paddle_transform = t;
-		}
-		if (t->name == "Ball") {
-			if (ball_transform) throw std::runtime_error("Multiple 'Ball' transforms in scene.");
-			ball_transform = t;
-		}
         // new line
 		if (t->name == "Cow") {
 			if (cow_transform) throw std::runtime_error("Multiple 'Cow' transforms in scene.");
@@ -99,8 +89,6 @@ Load< Scene > scene(LoadTagDefault, [](){
             crosshair_transform = t;
 		}
 	}
-	if (!paddle_transform) throw std::runtime_error("No 'Paddle' transform in scene.");
-	if (!ball_transform) throw std::runtime_error("No 'Ball' transform in scene.");
 	if (!cow_transform) throw std::runtime_error("No 'Cow' transform in scene.");
 	if (!pig_transform) throw std::runtime_error("No 'Pig' transform in scene.");
 	if (!sheep_transform) throw std::runtime_error("No 'Sheep' transform in scene.");
@@ -135,11 +123,16 @@ GameMode::GameMode(Client &client_) : client(client_) {
 
     {  // register animal to animal_list
         uint32_t id = 1;
+        auto start_with = [](std::string& target, std::string to_match) -> bool {
+            return target.find(to_match) == 0;
+        };
         for (Scene::Object *obj = scene->first_object; obj != nullptr; obj = obj->alloc_next) {
-            auto name = obj->transform->name;
-            if (name == "Cow" || name == "Pig" || name == "Sheep" || name == "Wolf") {
+            std::string name = obj->transform->name;
+            if (start_with(name, "Cow") || start_with(name, "Pig") ||
+                start_with(name, "Sheep") || start_with(name, "Wolf")) {
                 obj->transform->id = id;
                 animal_list[id++] = obj;
+                state.living_animal.insert(id);
             }
         }
 
@@ -149,6 +142,7 @@ GameMode::GameMode(Client &client_) : client(client_) {
         }
         dbg_cout("");
     }
+
 }
 
 GameMode::~GameMode() {
@@ -306,6 +300,12 @@ void GameMode::update(float elapsed) {
                         } else {
                             if (c->recv_buffer[1] == 'h') {
                                 state.identity.is_hunter = true;
+                                // sent the size of animals
+                                if (client.connection) {
+                                    size_t size = state.living_animal.size();
+                                    client.connection.send_raw("l", 1);
+                                    client.connection.send_raw(&size, sizeof(size_t));
+                                }
                             } else if (c->recv_buffer[1] == 'w') {
                                 state.identity.is_wolf = true;
                             }
@@ -365,7 +365,6 @@ void GameMode::update(float elapsed) {
                             uint32_t id, direction;
                             memcpy(&id, c->recv_buffer.data() + 1, sizeof(uint32_t));
                             memcpy(&direction, c->recv_buffer.data() + 1 + sizeof(uint32_t), sizeof(uint32_t));
-                            dbg_cout(direction);
                             animal_list[id]->transform->rotation = *(scene->direction.direction_map.at(direction));
                         }
                         c->recv_buffer.erase(c->recv_buffer.begin(),
@@ -375,17 +374,10 @@ void GameMode::update(float elapsed) {
             }
 		}
 
-
 	});
 
 
 	//copy game state to scene positions:
-	ball_transform->position.x = state.ball.x;
-	ball_transform->position.y = state.ball.y;
-
-	paddle_transform->position.x = state.paddle.x;
-	paddle_transform->position.y = state.paddle.y;
-
     crosshair_transform->position.x = state.crosshair.x;
     crosshair_transform->position.y = state.crosshair.y;
 

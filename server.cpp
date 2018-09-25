@@ -48,6 +48,16 @@ int main(int argc, char **argv) {
                             // e.g. hunter starts sending data once activated
                             c->recv_buffer.erase(c->recv_buffer.begin(),
                                                  c->recv_buffer.begin() + 10);
+                        } else if (*(c->recv_buffer.begin()) == 'l' && c->recv_buffer.size() >= 1 + 8) {
+                            size_t living_animal_size;
+                            memcpy(&living_animal_size, c->recv_buffer.data() + 1, sizeof(size_t));
+                            {  // init living_animal
+                                for (uint32_t id = 1; id < living_animal_size; id++) {
+                                    state.living_animal.insert(id);
+                                }
+                            }
+                            c->recv_buffer.erase(c->recv_buffer.begin(),
+                                                 c->recv_buffer.begin() + 1 + 8);
                         }
                     } else if (*(c->recv_buffer.begin()) == 'p') {
                         // "pc" or "pw" for position of crosshair/wolf
