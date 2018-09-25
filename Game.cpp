@@ -70,3 +70,10 @@ void Game::update(float time) {
     }
 
 }
+
+// game state is updated, need to send new information to server
+bool Game::need_to_send() {
+    return controls.move_up || controls.move_down ||
+           controls.move_left || controls.move_right ||
+           try_attack.first;
+}

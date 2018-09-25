@@ -19,6 +19,13 @@
 #include <cstddef>
 #include <random>
 
+#define DEBUG
+#ifdef DEBUG
+#define dbg_cout(...) std::cout << __VA_ARGS__ << std::endl;
+#else
+#define dbg_cout(...)
+#endif
+
 
 Load< MeshBuffer > meshes(LoadTagDefault, [](){
 	//return new MeshBuffer(data_path("paddle-ball.pnc"));
@@ -32,18 +39,19 @@ Load< GLuint > meshes_for_vertex_color_program(LoadTagDefault, [](){
 Scene::Transform *paddle_transform = nullptr;
 Scene::Transform *ball_transform = nullptr;
 // new line
+std::map< uint32_t, Scene::Object* > animal_list;
 Scene::Transform *cow_transform = nullptr;
 Scene::Transform *pig_transform = nullptr;
 Scene::Transform *sheep_transform = nullptr;
 Scene::Transform *wolf_transform = nullptr;
 Scene::Transform *crosshair_transform = nullptr;
+Scene *non_const_scene = nullptr;  // non-const scene pointer for delete_transform function
 
 Scene::Camera *camera = nullptr;
 
 Load< Scene > scene(LoadTagDefault, [](){
 	Scene *ret = new Scene;
 	//load transform hierarchy:
-	//ret->load(data_path("paddle-ball.scene"), [](Scene &s, Scene::Transform *t, std::string const &m){
 	ret->load(data_path("wolf_in_sheeps_clothing.scene"), [](Scene &s, Scene::Transform *t, std::string const &m){
 		Scene::Object *obj = s.new_object(t);
 
@@ -57,6 +65,7 @@ Load< Scene > scene(LoadTagDefault, [](){
 		obj->start = mesh.start;
 		obj->count = mesh.count;
 	});
+    non_const_scene = ret;
 
 	//look up paddle and ball transforms:
 	for (Scene::Transform *t = ret->first_transform; t != nullptr; t = t->alloc_next) {
@@ -111,6 +120,34 @@ Load< Scene > scene(LoadTagDefault, [](){
 
 GameMode::GameMode(Client &client_) : client(client_) {
 	client.connection.send_raw("h", 1); //send a 'hello' to the server
+
+    // new line
+    state.cow.x = cow_transform->position.x;
+    state.cow.y = cow_transform->position.y;
+    state.pig.x = pig_transform->position.x;
+    state.pig.y = pig_transform->position.y;
+    state.sheep.x = sheep_transform->position.x;
+    state.sheep.y = sheep_transform->position.y;
+    state.wolf.x = wolf_transform->position.x;
+    state.wolf.y = wolf_transform->position.y;
+    state.crosshair.x = crosshair_transform->position.x;
+    state.crosshair.y = crosshair_transform->position.y;
+
+    {  // register animal to animal_list
+        uint32_t id = 1;
+        for (Scene::Object *obj = scene->first_object; obj != nullptr; obj = obj->alloc_next) {
+            auto name = obj->transform->name;
+            if (name == "Cow" || name == "Pig" || name == "Sheep" || name == "Wolf") {
+                animal_list[id++] = obj;
+            }
+        }
+
+        dbg_cout("Register animal_list");
+        for (auto &it : animal_list) {
+            dbg_cout("id " << it.first << " name " << it.second->transform->name);
+        }
+        dbg_cout("");
+    }
 }
 
 GameMode::~GameMode() {
@@ -128,27 +165,61 @@ bool GameMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 		state.paddle.x = std::min(state.paddle.x,  0.5f * Game::FrameWidth - 0.5f * Game::PaddleWidth);
 	}
 
-    {  // control crosshair
+    {  // player controls
         if (evt.type == SDL_KEYDOWN || evt.type == SDL_KEYUP) {
-            //if (evt.key.keysym.scancode == SDL_SCANCODE_W) {
-            if (evt.key.keysym.scancode == SDL_SCANCODE_UP) {
+            // both WASD and arrow keys can control crosshair/wolf
+            if (evt.key.keysym.scancode == SDL_SCANCODE_UP ||
+                evt.key.keysym.scancode == SDL_SCANCODE_W) {
                 state.controls.move_up = (evt.type == SDL_KEYDOWN);
                 return true;
-            //} else if (evt.key.keysym.scancode == SDL_SCANCODE_S) {
-            } else if (evt.key.keysym.scancode == SDL_SCANCODE_DOWN) {
+            } else if (evt.key.keysym.scancode == SDL_SCANCODE_DOWN ||
+                       evt.key.keysym.scancode == SDL_SCANCODE_S) {
                 state.controls.move_down = (evt.type == SDL_KEYDOWN);
                 return true;
-            //} else if (evt.key.keysym.scancode == SDL_SCANCODE_A) {
-            } else if (evt.key.keysym.scancode == SDL_SCANCODE_LEFT) {
+            } else if (evt.key.keysym.scancode == SDL_SCANCODE_LEFT ||
+                       evt.key.keysym.scancode == SDL_SCANCODE_A) {
                 state.controls.move_left = (evt.type == SDL_KEYDOWN);
                 return true;
-            //} else if (evt.key.keysym.scancode == SDL_SCANCODE_D) {
-            } else if (evt.key.keysym.scancode == SDL_SCANCODE_RIGHT) {
+            } else if (evt.key.keysym.scancode == SDL_SCANCODE_RIGHT ||
+                       evt.key.keysym.scancode == SDL_SCANCODE_D) {
                 state.controls.move_right = (evt.type == SDL_KEYDOWN);
                 return true;
             }
+
+            // press space to attack
+            if (evt.key.keysym.scancode == SDL_SCANCODE_SPACE && evt.type == SDL_KEYDOWN) {
+                if (state.identity.is_hunter) {
+                    dbg_cout("Hunter attack");
+                    for (auto &a : animal_list) {
+                        uint32_t id = a.first;
+                        Scene::Object *obj = a.second;
+                        Scene::Transform *t = obj->transform;
+                        if (glm::distance(state.crosshair, glm::vec2(t->position.x, t->position.y)) < 1.0f) {
+                            dbg_cout("Try to kill id " << id << " name "<< t->name);
+                            state.try_attack = std::make_pair(true, id);
+                            break;
+                        }
+                    }
+                } else if (state.identity.is_wolf) {
+                    dbg_cout("Wolf attack");
+                    for (auto &a : animal_list) {
+                        uint32_t id = a.first;
+                        Scene::Object *obj = a.second;
+                        Scene::Transform *t = obj->transform;
+                        if (t->name == "Wolf") {  // don't check wolf itself
+                            continue;
+                        }
+                        if (glm::distance(state.wolf, glm::vec2(t->position.x, t->position.y)) < 1.0f) {
+                            dbg_cout("Try to kill id " << id << " name "<< t->name);
+                            state.try_attack = std::make_pair(true, id);
+                            break;
+                        }
+                    }  // end for
+                }  // end else if
+            }  // end if
         }
     }
+
 
 	return false;
 }
@@ -156,8 +227,9 @@ bool GameMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 void GameMode::update(float elapsed) {
 	state.update(elapsed);
 
-	if (client.connection) {
-        // send crosshair/wolf position to server
+    // send crosshair/wolf position to server when game state is changed
+	if (client.connection && state.need_to_send()) {
+        // positions
         if (state.identity.is_hunter) {
             // pc: Crosshair Position
             client.connection.send_raw("pc", 2);
@@ -172,6 +244,13 @@ void GameMode::update(float elapsed) {
             std::cout << "no charactor" << std::endl;
         }
 
+        // attack
+        if (state.try_attack.first) {
+            dbg_cout("send attack target id " << state.try_attack.second);
+            client.connection.send_raw("a", 1);
+            client.connection.send_raw(&state.try_attack.second, sizeof(uint32_t));
+            state.try_attack = std::make_pair(false, 0);  // reset try_attack
+        }
 	}
 
 	client.poll([&](Connection *c, Connection::Event event) {
@@ -180,40 +259,66 @@ void GameMode::update(float elapsed) {
 		} else if (event == Connection::OnClose) {
 			std::cerr << "Lost connection to server." << std::endl;
 		} else { assert(event == Connection::OnRecv);
-            if (!state.identity.is_hunter && !state.identity.is_wolf) {  // no character
-                if (c->recv_buffer[0] == 'i') {
-                    size_t data_len = 2 * sizeof(char);
-                    if (c->recv_buffer.size() < data_len) {
+            while (!c->recv_buffer.empty()) {
+                // handle identity
+                if (!state.identity.is_hunter && !state.identity.is_wolf) {
+                    if (c->recv_buffer[0] == 'i') {  // "ih" or "iw"
+                        if (c->recv_buffer.size() < 2) {
+                            return;
+                        } else {
+                            if (c->recv_buffer[1] == 'h') {
+                                state.identity.is_hunter = true;
+                            } else if (c->recv_buffer[1] == 'w') {
+                                state.identity.is_wolf = true;
+                            }
+                            c->recv_buffer.clear();
+                        }
+                    } else if (*(c->recv_buffer.begin()) == 'p' && c->recv_buffer.size() >= 10) {
+                        // ignore any data received before both of two players are registered
+
+                        // probably won't get here because server will not send position data until both
+                        // players are registered
+                        c->recv_buffer.erase(c->recv_buffer.begin(),
+                                             c->recv_buffer.begin() + 10);
+                    } else if (*(c->recv_buffer.begin()) == 'a' && c->recv_buffer.size() >= 5) {
+                        c->recv_buffer.erase(c->recv_buffer.begin(),
+                                             c->recv_buffer.begin() + 5);
+                    }
+                // handle position update
+                } else if (*(c->recv_buffer.begin()) == 'p') {  // [pw/pc][float x][float y]
+                    if (c->recv_buffer.size() < 2 * (sizeof(char) + sizeof(float))) {
                         return;
                     } else {
-                        if (c->recv_buffer[1] == 'h') {
-                            state.identity.is_hunter = true;
-                        } else if (c->recv_buffer[1] == 'w') {
-                            state.identity.is_wolf = true;
+                        if (*(c->recv_buffer.begin() + 1) == 'w' && state.identity.is_hunter) {
+                            memcpy(&state.wolf.x, c->recv_buffer.data() + 2, sizeof(float));
+                            memcpy(&state.wolf.y, c->recv_buffer.data() + 2 + sizeof(float), sizeof(float));
+                        } else if (*(c->recv_buffer.begin() + 1) == 'c' && state.identity.is_wolf) {
+                            memcpy(&state.crosshair.x, c->recv_buffer.data() + 2, sizeof(float));
+                            memcpy(&state.crosshair.y, c->recv_buffer.data() + 2 + sizeof(float), sizeof(float));
                         }
-                        c->recv_buffer.clear();
+                        c->recv_buffer.erase(c->recv_buffer.begin(),
+                                             c->recv_buffer.begin() + 2 * (sizeof(char) + sizeof(float)));
                     }
-                } else if (c->recv_buffer[0] == 'p' && c->recv_buffer.size() >= 10) {
-                    // ignore any data received before both of two players are registered
-
-                    // probably won't get here because server will not send position data until both
-                    // players are registered
-                    c->recv_buffer.erase(c->recv_buffer.begin(),
-                                         c->recv_buffer.begin() + 10);
-                    c->recv_buffer.shrink_to_fit();
-                }
-            } else if (c->recv_buffer[0] == 'p') {
-                if (c->recv_buffer.size() < 2 * (sizeof(char) + sizeof(float))) {
-                    return;
-                } else {
-                    if (c->recv_buffer[1] == 'w' && state.identity.is_hunter) {
-                        memcpy(&state.wolf.x, c->recv_buffer.data() + 2, sizeof(float));
-                        memcpy(&state.wolf.y, c->recv_buffer.data() + 2 + sizeof(float), sizeof(float));
-                    } else if (c->recv_buffer[1] == 'c' && state.identity.is_wolf) {
-                        memcpy(&state.crosshair.x, c->recv_buffer.data() + 2, sizeof(float));
-                        memcpy(&state.crosshair.y, c->recv_buffer.data() + 2 + sizeof(float), sizeof(float));
+                // handle attack event
+                } else if (*(c->recv_buffer.begin()) == 'a') {
+                    if (c->recv_buffer.size() < 1 + sizeof(uint32_t)) {
+                        return;
+                    } else {
+                        uint32_t target;
+                        memcpy(&target, c->recv_buffer.data() + 1, sizeof(uint32_t));
+                        // remove from animal_list, scene, living_animal
+                        if (!animal_list.empty()) {
+                            Scene::Object *obj = animal_list[target];
+                            dbg_cout("Receive kill id " << target << " name " << obj->transform->name);
+                            non_const_scene->delete_object(obj);
+                            animal_list.erase(target);
+                        }
+                        if (!state.living_animal.empty()) {
+                            state.living_animal.erase(target);
+                        }
+                        c->recv_buffer.erase(c->recv_buffer.begin(),
+                                             c->recv_buffer.begin() + 1 + sizeof(uint32_t));
                     }
-                    c->recv_buffer.clear();
                 }
             }
 		}
@@ -234,6 +339,7 @@ void GameMode::update(float elapsed) {
 
     wolf_transform->position.x = state.wolf.x;
     wolf_transform->position.y = state.wolf.y;
+
 }
 
 void GameMode::draw(glm::uvec2 const &drawable_size) {

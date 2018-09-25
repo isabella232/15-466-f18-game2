@@ -36,7 +36,4 @@ struct GameMode : public Mode {
 	//------ networking ------
 	Client &client; //client object; manages connection to server.
 
-	//------ who you are ------
-    //bool is_hunter = false;
-    //bool is_wolf = false;
 };
